@@ -1,0 +1,53 @@
+---
+- name: Create private key for new certificate on {{ certificate_host }}
+  community.crypto.openssl_privatekey:
+    path: "{{ certificate_path }}/{{ certificate_name }}.key"
+  delegate_to: "{{ certificate_host }}"
+  run_once: true
+
+- name: Create certificate signing request (CSR) for new certificate
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ certificate_path }}/{{ certificate_name }}.key"
+    subject_alt_name:
+      - "DNS:{{ certificate_name }}"
+      - "DNS:{{ certificate_name }}.{{domain_name }}"
+      - "DNS:ldap.{{ certificate_name }}"
+  delegate_to: "{{ certificate_host }}"
+  run_once: true
+  register: csr
+
+- name: Check whether certificate exists
+  ansible.builtin.stat:
+    path: "{{ certificate_path }}/{{ certificate_name }}.pem"
+  delegate_to: "{{ certificate_host }}"
+  run_once: true
+  register: certificate_exists
+
+- name: Read existing certificate if exists
+  ansible.builtin.slurp:
+    src: "{{ certificate_path }}/{{ certificate_name }}.pem"
+  when: certificate_exists.stat.exists
+  delegate_to: "{{ certificate_host }}"
+  run_once: true
+  register: certificate
+
+- name: Sign certificate with our CA
+  community.crypto.x509_certificate_pipe:
+    content: "{{ (certificate.content | b64decode) if certificate_exists.stat.exists else omit }}"
+    csr_content: "{{ csr.csr }}"
+    provider: ownca
+    ownca_path: "{{ certificate_path }}/{{ ca_certificate_name }}.pem"
+    ownca_privatekey_path: "{{ certificate_path }}/{{ ca_certificate_name }}.key"
+    ownca_privatekey_passphrase: "{{ secret_ca_passphrase }}"
+    ownca_not_after: +365d  # valid for one year
+    ownca_not_before: "-1d"  # valid since yesterday
+  delegate_to: "{{ certificate_host }}"
+  run_once: true
+  register: certificate
+
+- name: Write certificate file on {{ certificate_host }}
+  copy:
+    dest: "{{ certificate_path }}/{{ certificate_name }}.pem"
+    content: "{{ certificate.certificate }}"
+  delegate_to: "{{ certificate_host }}"
+  run_once: true
