@@ -1,0 +1,48 @@
+---
+- name: Create CA cert
+  hosts: localhost
+  tasks:
+  - ansible.builtin.set_fact:
+      certificate_host: localhost
+      certificate_path: /ansible/certs
+      ca_certificate_name: ca
+      ca_common_name: CloudBox CA
+      certificate_names:
+        - ldap1
+        - ldap2
+      domain_name: cloudboxservices.com
+      secret_ca_passphrase: secret
+
+  - name: Create private key with password protection
+    community.crypto.openssl_privatekey:
+      path: "{{ certificate_path }}/{{ ca_certificate_name }}.key"
+      passphrase: "{{ secret_ca_passphrase }}"
+      cipher: auto
+      size: 4096
+
+  - name: Create certificate signing request (CSR) for CA certificate
+    community.crypto.openssl_csr_pipe:
+      privatekey_path: "{{ certificate_path }}/{{ ca_certificate_name }}.key"
+      privatekey_passphrase: "{{ secret_ca_passphrase }}"
+      common_name: "{{ ca_common_name }}"
+      use_common_name_for_san: false  # since we do not specify SANs, don't use CN as a SAN
+      basic_constraints:
+        - 'CA:TRUE'
+      basic_constraints_critical: true
+      key_usage:
+        - keyCertSign
+      key_usage_critical: true
+    register: ca_csr
+
+  - name: Create self-signed CA certificate from CSR
+    community.crypto.x509_certificate:
+      path: "{{ certificate_path }}/{{ ca_certificate_name }}.pem"
+      csr_content: "{{ ca_csr.csr }}"
+      privatekey_path: "{{ certificate_path }}/{{ ca_certificate_name }}.key"
+      privatekey_passphrase: "{{ secret_ca_passphrase }}"
+      provider: selfsigned
+
+  - ansible.builtin.include_tasks: certs.yml
+    loop: "{{ certificate_names|default('[]') }}"
+    loop_control:
+      loop_var: certificate_name
