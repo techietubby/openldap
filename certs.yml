@@ -11,7 +11,7 @@
     subject_alt_name:
       - "DNS:{{ certificate_name }}"
       - "DNS:{{ certificate_name }}.{{domain_name }}"
-      - "DNS:ldap.{{ certificate_name }}"
+      - "DNS:ldap.{{ domain_name }}"
   delegate_to: "{{ certificate_host }}"
   run_once: true
   register: csr
