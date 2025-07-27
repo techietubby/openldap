@@ -8,6 +8,7 @@
 - name: Create certificate signing request (CSR) for new certificate
   community.crypto.openssl_csr_pipe:
     privatekey_path: "{{ certificate_path }}/{{ certificate_name }}.key"
+    common_name: {{ certificate_name }}.{{domain_name }}"
     subject_alt_name:
       - "DNS:{{ certificate_name }}"
       - "DNS:{{ certificate_name }}.{{domain_name }}"
