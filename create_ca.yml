@@ -40,6 +40,7 @@
       csr_content: "{{ ca_csr.csr }}"
       privatekey_path: "{{ certificate_path }}/{{ ca_certificate_name }}.key"
       privatekey_passphrase: "{{ secret_ca_passphrase }}"
+      # ownca_not_after: "+3650d"
       provider: selfsigned
 
   - ansible.builtin.include_tasks: certs.yml
